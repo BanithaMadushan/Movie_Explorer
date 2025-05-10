@@ -29,13 +29,17 @@ authApi.interceptors.request.use(
 // Auth service functions
 export const register = async (username, email, password) => {
   try {
+    console.log('Sending registration request:', { username, email });
     const response = await authApi.post('/auth/register', {
       username,
       email,
       password
     });
+    console.log('Registration response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Registration error:', error);
+    console.error('Error response:', error.response?.data);
     throw new Error(error.response?.data?.message || 'Registration failed');
   }
 };

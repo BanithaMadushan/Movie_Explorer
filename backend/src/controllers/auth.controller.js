@@ -6,9 +6,12 @@ const { validationResult } = require('express-validator');
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
+    console.log('Registration attempt:', req.body.email);
+    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         success: false,
         errors: errors.array() 
@@ -23,6 +26,7 @@ exports.register = async (req, res, next) => {
     });
 
     if (userExists) {
+      console.log('User already exists:', userExists.email === email ? 'Email taken' : 'Username taken');
       if (userExists.email === email) {
         return res.status(400).json({
           success: false,
@@ -36,6 +40,8 @@ exports.register = async (req, res, next) => {
       }
     }
 
+    console.log('Creating new user:', { username, email });
+    
     // Create user
     const user = await User.create({
       username,
@@ -44,9 +50,12 @@ exports.register = async (req, res, next) => {
       joinDate: new Date()
     });
 
+    console.log('User created successfully:', user._id);
+
     // Send token response
     sendTokenResponse(user, 201, res);
   } catch (error) {
+    console.error('Registration error:', error);
     next(error);
   }
 };
