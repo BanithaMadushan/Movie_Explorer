@@ -21,7 +21,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3001',
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL, 'https://movie-explorer-frontend.vercel.app'] 
+    : 'http://localhost:3001',
   credentials: true
 }));
 app.use(express.json());

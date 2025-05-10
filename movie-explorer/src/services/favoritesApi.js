@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5004/api';
+const API_URL = process.env.NODE_ENV === 'production'
+  ? process.env.REACT_APP_API_URL || 'https://movie-explorer-backend.vercel.app/api'
+  : 'http://localhost:5004/api';
 
 // Create axios instance for favorites API
 const favoritesApi = axios.create({
