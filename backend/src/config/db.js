@@ -2,13 +2,16 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://banithamadu12:banitha%401234@movie.jj9ig6m.mongodb.net/?retryWrites=true&w=majority&appName=movie';
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://banithamadu12:banitha%401234@movie.jj9ig6m.mongodb.net/movie-explorer';
     
-    const conn = await mongoose.connect(MONGODB_URI);
+    const conn = await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
   }
 };
