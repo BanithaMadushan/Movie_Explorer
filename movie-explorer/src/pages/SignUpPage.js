@@ -80,7 +80,7 @@ const SignUpPage = () => {
       await signup(formData.username, formData.email, formData.password);
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }

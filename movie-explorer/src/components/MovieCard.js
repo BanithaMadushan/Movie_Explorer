@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -14,10 +14,11 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import { Favorite, FavoriteBorder } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Info } from '@mui/icons-material';
 import { getImageUrl } from '../services/api';
 import { useMovieContext } from '../context/MovieContext';
 import { useAuth } from '../context/AuthContext';
+import { isFavorite as checkIsFavorite } from '../services/favoritesService';
 
 // Direct TMDb image URL for emergency backup
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
@@ -25,24 +26,51 @@ const FALLBACK_IMAGE = 'https://via.placeholder.com/300x450?text=No+Image';
 
 const MovieCard = ({ movie, hideRating }) => {
   const navigate = useNavigate();
-  const { toggleFavorite, isFavorite } = useMovieContext();
+  const { toggleFavorite } = useMovieContext();
   const { currentUser } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
+  
+  // Check if movie is in favorites when the component mounts
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (currentUser && movie?.id) {
+        try {
+          const favoriteStatus = await checkIsFavorite(movie.id);
+          setIsFavorite(favoriteStatus);
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+        }
+      }
+    };
+    
+    checkFavoriteStatus();
+  }, [currentUser, movie?.id]);
   
   const handleCardClick = () => {
     navigate(`/movie/${movie.id}`);
   };
   
-  const handleFavoriteClick = (e) => {
-    e.stopPropagation();
+  const handleFavoriteClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Stop event propagation to prevent card click
+    
+    if (!currentUser) {
+      setShowLoginAlert(true);
+      return;
+    }
+    
     try {
-      toggleFavorite(movie);
+      console.log('Toggling favorite for movie:', movie);
+      await toggleFavorite(movie);
+      setIsFavorite(!isFavorite);
+      console.log('Favorite toggled successfully, new state:', !isFavorite);
     } catch (error) {
-      if (error.message === 'Please log in to add favorites') {
-        setShowLoginAlert(true);
-      }
+      console.error('Error toggling favorite from component:', error);
+      // Show error to user
+      alert(`Failed to ${isFavorite ? 'remove from' : 'add to'} favorites. Please try again later.`);
     }
   };
   
@@ -138,7 +166,7 @@ const MovieCard = ({ movie, hideRating }) => {
                 p: 1,
               }}
             >
-              <Tooltip title={isFavorite(movie.id) ? "Remove from favorites" : "Add to favorites"}>
+              <Tooltip title={isFavorite ? "Remove from favorites" : "Add to favorites"}>
                 <IconButton
                   onClick={handleFavoriteClick}
                   sx={{
@@ -148,7 +176,7 @@ const MovieCard = ({ movie, hideRating }) => {
                     },
                   }}
                 >
-                  {isFavorite(movie.id) ? (
+                  {isFavorite ? (
                     <Favorite sx={{ color: 'red' }} />
                   ) : (
                     <FavoriteBorder sx={{ color: 'white' }} />

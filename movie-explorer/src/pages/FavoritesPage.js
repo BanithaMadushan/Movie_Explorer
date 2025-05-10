@@ -18,15 +18,10 @@ const FavoritesPage = () => {
     }
   }, [currentUser, navigate]);
   
-  const handleClearFavorites = async () => {
+  const handleClearFavorites = () => {
     // Remove all favorites
     if (window.confirm('Are you sure you want to clear all favorites?')) {
-      try {
-        await clearAllFavorites();
-      } catch (error) {
-        console.error('Failed to clear favorites:', error);
-        alert('Failed to clear favorites. Please try again.');
-      }
+      clearAllFavorites();
     }
   };
   

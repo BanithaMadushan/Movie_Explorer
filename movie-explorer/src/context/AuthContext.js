@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { register as apiRegister, login as apiLogin, logout as apiLogout, getCurrentUser, updateProfile as apiUpdateProfile } from '../services/authApi';
+import axios from 'axios';
+
+// API URL
+const API_URL = 'http://localhost:5000/api';
 
 // Create context
 const AuthContext = createContext();
@@ -9,22 +12,28 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-// For demo purposes, we'll use localStorage to store user data
-// In a real application, you would use proper authentication with a backend
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
+
+  // Configure axios defaults
+  axios.defaults.baseURL = API_URL;
+  
+  if (token) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
 
   useEffect(() => {
-    // Check if user is logged in with token
-    const checkLoggedIn = async () => {
+    // Check if user is logged in (from token)
+    const checkUserLoggedIn = async () => {
       if (token) {
         try {
-          const response = await getCurrentUser();
-          setCurrentUser(response.data);
+          const res = await axios.get('/auth/profile');
+          setCurrentUser(res.data.user);
         } catch (error) {
-          // Token might be invalid, clear it
+          // If token is invalid, remove it
+          console.error('Error loading user profile:', error);
           localStorage.removeItem('token');
           setToken(null);
         }
@@ -32,59 +41,75 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     };
 
-    checkLoggedIn();
+    checkUserLoggedIn();
   }, [token]);
-
-  const signup = async (username, email, password) => {
-    try {
-      const response = await apiRegister(username, email, password);
-      
-      // Save token and user data
-      localStorage.setItem('token', response.token);
-      setToken(response.token);
-      setCurrentUser(response.user);
-      
-      return response.user;
-    } catch (error) {
-      throw new Error(error.message || 'Failed to sign up');
-    }
-  };
 
   const login = async (email, password) => {
     try {
-      const response = await apiLogin(email, password);
+      const res = await axios.post('/auth/login', { email, password });
       
-      // Save token and user data
-      localStorage.setItem('token', response.token);
-      setToken(response.token);
-      setCurrentUser(response.user);
+      // Save token to localStorage and state
+      localStorage.setItem('token', res.data.token);
+      setToken(res.data.token);
       
-      return response.user;
+      // Update axios headers
+      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      
+      // Set current user
+      setCurrentUser(res.data.user);
+      
+      return res.data.user;
     } catch (error) {
-      throw new Error(error.message || 'Failed to login');
+      throw new Error(error.response?.data?.message || 'Failed to login');
     }
   };
 
-  const logout = async () => {
+  const signup = async (username, email, password) => {
     try {
-      await apiLogout();
+      const res = await axios.post('/auth/register', {
+        username,
+        email,
+        password
+      });
+      
+      // Save token to localStorage and state
+      localStorage.setItem('token', res.data.token);
+      setToken(res.data.token);
+      
+      // Update axios headers
+      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      
+      // Set current user
+      setCurrentUser(res.data.user);
+      
+      return res.data.user;
     } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear user data regardless of API success
-      setCurrentUser(null);
-      setToken(null);
-      localStorage.removeItem('token');
+      throw new Error(error.response?.data?.message || 'Failed to sign up');
     }
+  };
+
+  const logout = () => {
+    // Remove token from localStorage and state
+    localStorage.removeItem('token');
+    setToken(null);
+    
+    // Remove authorization header
+    delete axios.defaults.headers.common['Authorization'];
+    
+    // Clear current user
+    setCurrentUser(null);
   };
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await apiUpdateProfile(profileData);
-      setCurrentUser(response.data);
-      return response.data;
+      const res = await axios.put('/auth/profile', profileData);
+      
+      // Update current user
+      setCurrentUser(res.data.user);
+      
+      return res.data.user;
     } catch (error) {
-      throw new Error('Failed to update profile');
+      throw new Error(error.response?.data?.message || 'Failed to update profile');
     }
   };
 
@@ -94,8 +119,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
-    updateProfile,
-    isAuthenticated: !!token
+    updateProfile
   };
 
   return (

@@ -49,7 +49,7 @@ const LoginPage = () => {
       await login(formData.email, formData.password);
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      setError('Invalid email or password');
     } finally {
       setLoading(false);
     }
