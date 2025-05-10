@@ -1,0 +1,16 @@
+{
+  "name": "movie-explorer-app",
+  "version": "1.0.0",
+  "description": "Movie Explorer Application with React Frontend and Express Backend",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd movie-explorer && npm start",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd movie-explorer && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../movie-explorer && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 
