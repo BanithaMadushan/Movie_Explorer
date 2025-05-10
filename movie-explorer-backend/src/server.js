@@ -14,8 +14,13 @@ connectDB();
 // Create Express app
 const app = express();
 
+// Configure CORS
+app.use(cors({
+  origin: ['https://movieflixonline.vercel.app', 'http://localhost:3000'],
+  credentials: true
+}));
+
 // Middleware
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
