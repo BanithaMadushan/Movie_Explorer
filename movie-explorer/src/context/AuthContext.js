@@ -1,8 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
-
-// API URL
-const API_URL = 'http://localhost:5000/api';
 
 // Create context
 const AuthContext = createContext();
@@ -12,27 +8,56 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
+// Initialize demo users if they don't exist
+const initializeDemoUsers = () => {
+  if (!localStorage.getItem('users')) {
+    // Create demo users
+    const demoUsers = [
+      {
+        id: '1',
+        username: 'demo',
+        email: 'demo@example.com',
+        password: 'password',
+        favorites: []
+      },
+      {
+        id: '2',
+        username: 'user',
+        email: 'user@example.com',
+        password: 'password',
+        favorites: []
+      }
+    ];
+    
+    // Save to localStorage
+    localStorage.setItem('users', JSON.stringify(demoUsers));
+    console.log('Demo users initialized');
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Configure axios defaults
-  axios.defaults.baseURL = API_URL;
-  
-  if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
-
   useEffect(() => {
-    // Check if user is logged in (from token)
-    const checkUserLoggedIn = async () => {
+    // Initialize demo users
+    initializeDemoUsers();
+    
+    // Check if user is logged in (from localStorage)
+    const checkUserLoggedIn = () => {
       if (token) {
         try {
-          const res = await axios.get('/auth/profile');
-          setCurrentUser(res.data.user);
+          // Get user data from localStorage
+          const userData = JSON.parse(localStorage.getItem('user'));
+          if (userData) {
+            setCurrentUser(userData);
+          } else {
+            // If no user data, remove token
+            localStorage.removeItem('token');
+            setToken(null);
+          }
         } catch (error) {
-          // If token is invalid, remove it
           console.error('Error loading user profile:', error);
           localStorage.removeItem('token');
           setToken(null);
@@ -46,55 +71,90 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const res = await axios.post('/auth/login', { email, password });
+      // Get users from localStorage or initialize empty array
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Find user with matching email and password
+      const user = users.find(user => user.email === email && user.password === password);
+      
+      if (!user) {
+        throw new Error('Invalid email or password');
+      }
+      
+      // Create a token (simple implementation for demo)
+      const mockToken = `demo-token-${Date.now()}`;
+      
+      // Remove password from user object before storing in state
+      const { password: _, ...userWithoutPassword } = user;
       
       // Save token to localStorage and state
-      localStorage.setItem('token', res.data.token);
-      setToken(res.data.token);
+      localStorage.setItem('token', mockToken);
+      setToken(mockToken);
       
-      // Update axios headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      // Save user to localStorage
+      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
       
       // Set current user
-      setCurrentUser(res.data.user);
+      setCurrentUser(userWithoutPassword);
       
-      return res.data.user;
+      return userWithoutPassword;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to login');
+      throw new Error(error.message || 'Failed to login');
     }
   };
 
   const signup = async (username, email, password) => {
     try {
-      const res = await axios.post('/auth/register', {
+      // Get existing users or initialize empty array
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Check if email already exists
+      if (users.some(user => user.email === email)) {
+        throw new Error('Email already exists');
+      }
+      
+      // Create new user
+      const newUser = {
+        id: Date.now().toString(),
         username,
         email,
-        password
-      });
+        password,
+        favorites: []
+      };
+      
+      // Add to users array
+      users.push(newUser);
+      
+      // Save updated users array
+      localStorage.setItem('users', JSON.stringify(users));
+      
+      // Create a token
+      const mockToken = `demo-token-${Date.now()}`;
+      
+      // Remove password from user object before storing in state
+      const { password: _, ...userWithoutPassword } = newUser;
       
       // Save token to localStorage and state
-      localStorage.setItem('token', res.data.token);
-      setToken(res.data.token);
+      localStorage.setItem('token', mockToken);
+      setToken(mockToken);
       
-      // Update axios headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      // Save user to localStorage
+      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
       
       // Set current user
-      setCurrentUser(res.data.user);
+      setCurrentUser(userWithoutPassword);
       
-      return res.data.user;
+      return userWithoutPassword;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to sign up');
+      throw new Error(error.message || 'Failed to sign up');
     }
   };
 
   const logout = () => {
-    // Remove token from localStorage and state
+    // Remove token and user from localStorage
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setToken(null);
-    
-    // Remove authorization header
-    delete axios.defaults.headers.common['Authorization'];
     
     // Clear current user
     setCurrentUser(null);
@@ -102,14 +162,116 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const res = await axios.put('/auth/profile', profileData);
+      // Get current user data
+      const userData = JSON.parse(localStorage.getItem('user'));
+      
+      // Get all users
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Update user in users array
+      const updatedUsers = users.map(user => {
+        if (user.id === userData.id) {
+          return { ...user, ...profileData };
+        }
+        return user;
+      });
+      
+      // Save updated users array
+      localStorage.setItem('users', JSON.stringify(updatedUsers));
       
       // Update current user
-      setCurrentUser(res.data.user);
+      const updatedUser = { ...userData, ...profileData };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
       
-      return res.data.user;
+      return updatedUser;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to update profile');
+      throw new Error('Failed to update profile');
+    }
+  };
+
+  const addToFavorites = async (movie) => {
+    try {
+      if (!currentUser) {
+        throw new Error('You must be logged in to add favorites');
+      }
+
+      // Get current user data
+      const userData = JSON.parse(localStorage.getItem('user'));
+      
+      // Get all users
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Find current user in users array
+      const userIndex = users.findIndex(user => user.id === userData.id);
+      
+      if (userIndex === -1) {
+        throw new Error('User not found');
+      }
+
+      // Check if movie is already in favorites
+      const favorites = users[userIndex].favorites || [];
+      if (favorites.some(fav => fav.id === movie.id)) {
+        return userData; // Already a favorite
+      }
+
+      // Add movie to favorites
+      users[userIndex].favorites = [...favorites, movie];
+      
+      // Save updated users array
+      localStorage.setItem('users', JSON.stringify(users));
+      
+      // Update current user
+      const updatedUser = { 
+        ...userData, 
+        favorites: [...(userData.favorites || []), movie] 
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      
+      return updatedUser;
+    } catch (error) {
+      throw new Error(error.message || 'Failed to add favorite');
+    }
+  };
+
+  const removeFromFavorites = async (movieId) => {
+    try {
+      if (!currentUser) {
+        throw new Error('You must be logged in');
+      }
+
+      // Get current user data
+      const userData = JSON.parse(localStorage.getItem('user'));
+      
+      // Get all users
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Find current user in users array
+      const userIndex = users.findIndex(user => user.id === userData.id);
+      
+      if (userIndex === -1) {
+        throw new Error('User not found');
+      }
+
+      // Remove movie from favorites
+      const favorites = users[userIndex].favorites || [];
+      users[userIndex].favorites = favorites.filter(fav => fav.id !== movieId);
+      
+      // Save updated users array
+      localStorage.setItem('users', JSON.stringify(users));
+      
+      // Update current user
+      const updatedUser = {
+        ...userData,
+        favorites: (userData.favorites || []).filter(fav => fav.id !== movieId)
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      
+      return updatedUser;
+    } catch (error) {
+      throw new Error(error.message || 'Failed to remove favorite');
     }
   };
 
@@ -119,7 +281,9 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
-    updateProfile
+    updateProfile,
+    addToFavorites,
+    removeFromFavorites
   };
 
   return (

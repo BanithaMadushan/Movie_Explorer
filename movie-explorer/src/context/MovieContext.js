@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as movieAPI from '../services/api';
-import * as favoritesAPI from '../services/favoritesService';
 import { useAuth } from './AuthContext';
 
 // Create context
@@ -11,7 +10,7 @@ export const useMovieContext = () => useContext(MovieContext);
 
 // Provider component
 export const MovieProvider = ({ children, initialValues }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, addToFavorites: authAddToFavorites, removeFromFavorites: authRemoveFromFavorites } = useAuth();
   const [trendingMovies, setTrendingMovies] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [movieDetails, setMovieDetails] = useState(null);
@@ -25,21 +24,21 @@ export const MovieProvider = ({ children, initialValues }) => {
   const [totalPages, setTotalPages] = useState(0);
   const [selectedGenre, setSelectedGenre] = useState(null);
 
-  // Load user favorites from the API when user logs in
+  // Load user favorites from localStorage when user logs in
   useEffect(() => {
-    const fetchUserFavorites = async () => {
+    const loadUserFavorites = () => {
       if (currentUser) {
         try {
-          const response = await favoritesAPI.getFavorites();
-          // Transform the favorites data to match our app's movie format
-          const formattedFavorites = response.favorites.map(fav => ({
-            id: fav.movieId,
-            title: fav.title,
-            poster_path: fav.poster ? fav.poster.replace('https://image.tmdb.org/t/p/w500', '') : null
-          }));
-          setFavorites(formattedFavorites);
+          // Get current user data
+          const userData = JSON.parse(localStorage.getItem('user'));
+          if (userData && userData.favorites) {
+            setFavorites(userData.favorites);
+          } else {
+            setFavorites([]);
+          }
         } catch (err) {
-          console.error("Error loading favorites from API:", err);
+          console.error("Error loading favorites from localStorage:", err);
+          setFavorites([]);
         }
       } else {
         // Clear favorites when user logs out
@@ -47,7 +46,7 @@ export const MovieProvider = ({ children, initialValues }) => {
       }
     };
 
-    fetchUserFavorites();
+    loadUserFavorites();
   }, [currentUser]);
 
   // Load other preferences from localStorage
@@ -248,27 +247,24 @@ export const MovieProvider = ({ children, initialValues }) => {
       if (isCurrentlyFavorite) {
         // Remove from favorites
         console.log('Removing from favorites with ID:', movie.id);
-        const result = await favoritesAPI.removeFromFavorites(movie.id);
-        console.log('Remove favorite result:', result);
+        await authRemoveFromFavorites(movie.id);
         setFavorites(prevFavorites => prevFavorites.filter(fav => fav.id !== movie.id));
       } else {
         // Add to favorites
         console.log('Adding to favorites:', movie);
-        const result = await favoritesAPI.addToFavorites(movie);
-        console.log('Add favorite result:', result);
+        await authAddToFavorites(movie);
         setFavorites(prevFavorites => [...prevFavorites, movie]);
       }
     } catch (err) {
       console.error('Error toggling favorite:', err);
-      console.error('Error details:', err.response?.data || err.message);
       setError(`Failed to ${favorites.some(fav => fav.id === movie.id) ? 'remove from' : 'add to'} favorites. Please try again later.`);
       throw err; // Re-throw to allow component to handle the error
     }
-  }, [currentUser, favorites]);
+  }, [currentUser, favorites, authAddToFavorites, authRemoveFromFavorites]);
 
   // Check if a movie is in favorites
   const isFavorite = useCallback((movieId) => {
-    return favorites.some(movie => movie.id === movieId.toString());
+    return favorites.some(movie => movie.id === movieId.toString() || movie.id === movieId);
   }, [favorites]);
 
   // Clear all favorites
@@ -276,10 +272,29 @@ export const MovieProvider = ({ children, initialValues }) => {
     if (!currentUser || !favorites.length) return;
 
     try {
-      // Remove each favorite one by one
-      for (const movie of favorites) {
-        await favoritesAPI.removeFromFavorites(movie.id);
+      // Get current user data
+      const userData = JSON.parse(localStorage.getItem('user'));
+      
+      // Get all users
+      const users = JSON.parse(localStorage.getItem('users')) || [];
+      
+      // Find current user in users array
+      const userIndex = users.findIndex(user => user.id === userData.id);
+      
+      if (userIndex === -1) {
+        throw new Error('User not found');
       }
+
+      // Clear favorites array
+      users[userIndex].favorites = [];
+      
+      // Save updated users array
+      localStorage.setItem('users', JSON.stringify(users));
+      
+      // Update current user
+      const updatedUser = { ...userData, favorites: [] };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
       setFavorites([]);
     } catch (err) {
       console.error('Error clearing favorites:', err);
